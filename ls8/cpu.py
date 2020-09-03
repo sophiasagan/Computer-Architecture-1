@@ -2,6 +2,11 @@
 
 import sys
 
+# opcodes
+HLT = 0b00000001
+LDI = 0b10000010
+PRN = 0b01000111
+
 class CPU:
     """Main CPU class."""
 
@@ -80,4 +85,24 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
-        pass
+        running = True
+        
+        while running:
+            # get current instruction and store copy in IR register
+            self.IR = self.ram_read(self.PC)
+            # store bytes
+            operand_a = self.ram_read(self.PC + 1)
+            operand_b = self.ram_read(self.PC + 2)
+
+            if self.IR == HLT: # end loop
+                running = False
+
+            elif self.IR == LDI: # set value of reg to an integer
+                self.reg[operand_a] = operand_b
+                # point PC to next instruction
+                self.PC += 3
+
+            elif self.IR == PRN: # print decimal integer in reg
+                print(self.reg[operand_a])
+                # point PC to next instruction
+                self.PC += 2
