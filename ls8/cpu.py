@@ -7,12 +7,17 @@ import sys
 HLT = 0b00000001
 LDI = 0b10000010
 PRN = 0b01000111
+
 ADD = 0b10100000
 SUB = 0b10100001
 MUL = 0b10100010
 DIV = 0b10100011
+
 PUSH = 0b01000101
 POP = 0b01000110
+
+CALL = 0b01010000
+RET = 0b00010001
 
 
 class CPU:
@@ -30,53 +35,50 @@ class CPU:
 
         self.reg[7] = 0xF4 # Init stack pointer to address 0xF4
 
-        self.branchtable = {} # Init branchtable
+        
+        self.running = True
+
+        self.branchtable = {} # init branch table
+        self.branchtable[HLT] = self.handle_HLT
         self.branchtable[LDI] = self.handle_LDI
         self.branchtable[PRN] = self.handle_PRN
-        self.branchtable[HLT] = self.handle_HLT
-        
+
         self.branchtable[PUSH] = self.handle_PUSH
         self.branchtable[POP] = self.handle_POP
 
+        self.branchtable[CALL] = self.handle_CALL
+        self.branchtable[RET] = self.handle_RET
 
     def load(self):
         """Load a program into memory."""
-        # Get file name from command line arguments
+        
         if len(sys.argv) != 2:
             print("Usage: cpu.py filename")
-            sys.exit(1)
+            sys.exit()
 
-        # address = 0
-        
         try:
             with open(sys.argv[1]) as f:
                 for line in f:
-                    split_line = line.split("#")
-                    argument = split_line[0].strip()
-                    if argument == "":
+                    split_line = line.split('#') # split array
+                    string = split_line[0]
+
+                    if string == '':
                         continue
-                    if argument[0] == '1' or argument[0] == '0':
-                        instruction = argument[:8]
+
+                    if string[0] == '1' or string[0] == '0':
+                        instruction = string[:8]
                         self.ram[self.MAR] = int(instruction, 2)
                         self.MAR += 1
 
-                    # self.ram[address] = int(instruction, 2)
-                    # address += 1
-
-        except FileNotFoundError: 
-            print(f"{sys.argv[1]} file not found")
-            sys.exit(2)
-
-
-    # load(sys.argv[1])
+        except FileNotFoundError:
+                print(f'{sys.argv[1]} not found')
+                sys.exit()
 
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
-
-        if op == "ADD":
+        if op == ADD:
             self.reg[reg_a] += self.reg[reg_b]
-        # elif op == "SUB": etc
         elif op == SUB:
             self.reg[reg_a] -= self.reg[reg_b]
         elif op == MUL:
@@ -86,16 +88,28 @@ class CPU:
         else:
             raise Exception("Unsupported ALU operation")
 
+    def ram_read(self, address):
+        self.MAR = address
+        self.MDR = self.ram[self.MAR]
+
+        return self.MDR
+
+    def ram_write(self, address, value):
+        self.MAR = address
+        self.MDR = value
+
+        self.ram[self.MAR] = self.MDR
+
     def trace(self):
         """
-        Handy function to print out the CPU state. You might want to call this
+        Handy function to print out the CPU state. You might want to CALL this
         from run() if you need help debugging.
         """
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
             self.PC,
-            # self.FL,
-            # self.ie,
+            #self.FL,
+            #self.ie,
             self.ram_read(self.PC),
             self.ram_read(self.PC + 1),
             self.ram_read(self.PC + 2)
@@ -106,13 +120,8 @@ class CPU:
 
         print()
 
-    def ram_read(self, MAR):
-        return self.ram[MAR]
-
-    def ram_write(self, MAR, MDR):
-        self.ram[MAR] = MDR
-
     def handle_HLT(self):
+        self.running = False
         sys.exit()
 
     def handle_LDI(self):
@@ -126,40 +135,41 @@ class CPU:
         print(self.reg[register])
 
     def handle_POP(self):
-        # Get the value from address pointed to by the Stack Pointer
         value = self.ram_read(self.reg[7])
-
-        # Get the register number to copy into
         register = self.ram_read(self.PC + 1)
-
-        # Copy the value into the register
         self.reg[register] = value
 
-        # Increment the Stack Pointer
         self.reg[7] += 1
 
     def handle_PUSH(self):
-        # Decrement the Stack Pointer
         self.reg[7] -= 1
-
-        # Get the register to retrieve the value from
         register = self.ram_read(self.PC + 1)
-
-        # Get the value from the register
         value = self.reg[register]
 
-        # Copy the value to the address pointed to by the SP
         self.ram_write(self.reg[7], value)
+
+    def handle_CALL(self):
+        return_address = self.PC + 2
+        self.reg[7] -= 1
+        self.ram_write(self.reg[7], return_address)
+        reg_value = self.ram_read(self.PC + 1)
+        address = self.reg[reg_value]
+
+        self.PC = address
+
+    def handle_RET(self):
+        address = self.ram_read(self.reg[7])
+        self.reg[7] += 1
+
+        self.PC = address
 
     def run(self):
         """Run the CPU."""
-        running = True
-        
-        while running:
+        while self.running:
             instruction = self.ram_read(self.PC)
             self.IR = instruction
 
-            num_operands = instruction >> 6
+            operands = instruction >> 6
 
             operand_a = self.ram_read(self.PC + 1)
             operand_b = self.ram_read(self.PC + 2)
@@ -171,4 +181,9 @@ class CPU:
             else:
                 self.branchtable[self.IR]()
 
-            self.PC += num_operands + 1
+            PC_op = (instruction >> 4) & 0b0001
+
+            if not PC_op:
+                self.PC += operands + 1
+        
+        sys.exit()
