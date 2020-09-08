@@ -49,17 +49,34 @@ class CPU:
         self.alu("MUL", *operands)
         self.PC += 3
 
+    # Get file name from command line arguments
+    # if len(sys.argv) != 2:
+    #     print("Usage: example_cpu.py filename")
+    #     sys.exit(1)
+
     def load(self):
         """Load a program into memory."""
         address = 0
+        # try:
 
-        with open("ls8\examples\mult.ls8") as program:
-            for line in program:
+        with open("ls8\examples\mult.ls8") as f:
+            for line in f:
                 split_line = line.split("#")
                 instruction = split_line[0].strip()
-                if instruction != "":
-                    self.ram[address] = int(instruction, 2)
-                    address += 1
+                if instruction == "":
+                    continue
+                
+
+                self.ram[address] = int(instruction, 2)
+                address += 1
+
+    #     except FileNotFoundError: 
+    #         print(f"{sys.argv[1]} file not found")
+    #         sys.exit(2)
+
+
+    # load_memory(sys.argv[1])
+
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
@@ -102,12 +119,12 @@ class CPU:
         """Run the CPU."""
         running = True
         while running:
-            register_instruction = self.ram_read(self.PC)
+            self.IR = self.ram_read(self.PC)
             operand_a = self.ram_read(self.PC + 1)
             operand_b = self.ram_read(self.PC + 2)
             
-            if register_instruction in self.branchtable:
-                self.branchtable[register_instruction](operand_a, operand_b)
+            if self.IR in self.branchtable:
+                self.branchtable[self.IR](operand_a, operand_b)
             else:
                 exit(1)
             
